@@ -1,0 +1,81 @@
+Launch Configuration:
+# name = "XXXXXXXXXXXXXXXXXX" # you cannot use a name in an aws_launch_configuration when you are trying to use an aws_autoscaling_group
+# If you try to run more than once the Terraform plan you will get the following error if you have a name:
+#  Error creating launch configuration: AlreadyExists: Launch Configuration by this name already exists - A launch configuration already exists with the name XXXXXXXXXXXXXXXXXX
+#      status code: 400, request id: 85e21aa5-82d6-11e8-a434-5f89b1b899bb
+# 
+# As per documentation Either omit the Launch Configuration name attribute, or specify a partial name with name_prefix. (https://www.terraform.io/docs/providers/aws/r/launch_configuration.html)
+# If we want to re-create it, then we can set create_before_destroy = false
+# The problem with this is that we can't have two launch configuration with the same name at the same time.
+# The next problem if we use a name could be:
+#    aws_launch_configuration.simple_web_site_cluster_lc: ResourceInUse: Cannot delete launch configuration XXXXXXXXXXX - 20180708180153299700000001 because it is attached to AutoScalingGroup
+#      status code: 400, request id: 722f11c6-835b-11e8-ab1f-6fe98e98f9ab
+
+For high availability:
+Here’s how you can take advantage of this lifecycle setting to get a zero-downtime deployment:3
+    * Configure the name parameter of the ASG to depend directly on the name of the launch configuration. That way, each time the launch configuration changes (which it will when you update the AMI or User Data), Terraform will try to replace the ASG.
+    * Set the create_before_destroy parameter of the ASG to true, so each time Terraform tries to replace it, it will create the replacement before destroying the original.
+    * Set the min_elb_capacity parameter of the ASG to the min_size of the cluster so that Terraform will wait for at least that many servers from the new ASG to register in the ELB before it’ll start destroying the original ASG.
+
+
+/*
+UNDERSTANDING VARIABLES:
+
+variable "{NAME}" {
+  description = "Description of the variable"
+  type = "{string|list|map}""
+  default = {value}
+}
+
+Types list and map:
+
+list -> 
+  default = []
+  default = ["a", "b", "c"]
+You can specify lists in a terraform.tfvars file:
+  cidrs = [ "10.0.0.0/16", "10.1.0.0/16" ]
+
+map -> 
+  default = {
+    key1 = "value1"
+    key2 = "value2"
+    key3 = "value3"
+  }
+
+  variable "amis" {
+    type = "map"
+    default = {
+      "us-east-1" = "ami-b374d5a5"
+      "us-west-2" = "ami-4b32be2b"
+    }
+  }
+
+You can use the variable in a map later on like this:
+  ${var.amis["us-east-1"]}
+
+
+  https://www.terraform.io/intro/getting-started/variables.html
+  The default parameter is the last option if it's not provided in another way.
+  You can pass the option:
+    * Command-line flags. 
+        terraform apply \
+          -var 'access_key=foo' \
+          -var 'secret_key=bar'
+    * From a file
+        Create a file named terraform.tfvars with the following contents:
+          access_key = "foo"
+          secret_key = "bar"
+        For all files which match terraform.tfvars or *.auto.tfvars present in the current directory, Terraform automatically loads them to populate variables. If the file is named something else, you can use the -var-file flag directly to specify a file. 
+        $ terraform apply \
+          -var-file="secret.tfvars" \
+          -var-file="production.tfvars"
+    * From environment variables
+        Terraform will read environment variables in the form of TF_VAR_name to find the value for a variable. For example, the TF_VAR_access_key variable can be set to set the access_key variable.
+        Note: Environment variables can only populate string-type variables. List and map type variables must be populated via one of the other mechanisms.
+    * UI Input
+        If you execute terraform apply with certain variables unspecified, Terraform will ask you to input their values interactively. These values are not saved, but this provides a convenient workflow when getting started with Terraform. UI Input is not recommended for everyday use of Terraform.
+        Note: UI Input is only supported for string variables. List and map variables must be populated via one of the other mechanisms.
+
+
+
+*/
