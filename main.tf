@@ -1,4 +1,4 @@
-module "simple_web_site_cluster_module" {
+module "simple_web_site_asg_module" {
   source = "asg" # directory that contains the module (relative path)
 
   cluster_name        = "${var.cluster_name}"
